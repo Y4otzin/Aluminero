@@ -1,6 +1,8 @@
 # 🏗️ Plataforma Inteligente de Cotización y Producción
 
-Sistema web end-to-end para herrería de aluminio que unifica el proceso comercial y productivo mediante IA generativa, firma digital y liberación automática a fabricación.
+**Sistema web end-to-end para herrería de aluminio que unifica el proceso comercial y productivo mediante generación automática de bocetos vectoriales (SVG), firma digital y liberación automática a fabricación.**
+
+**Stack:** Next.js 18 + FastAPI + PostgreSQL + Supabase
 
 **Ref:** ALU-TA-2025-01  
 **Duración:** 18 semanas (9 sprints)  

@@ -36,8 +36,5 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-# TODO: Incluir routers en Sprint 1
-# from app.api.v1 import auth, users, projects
-# app.include_router(auth.router, prefix="/api/v1")
-# app.include_router(users.router, prefix="/api/v1")
-# app.include_router(projects.router, prefix="/api/v1")
+from app.api.v1 import sketch
+app.include_router(sketch.router, prefix="/api/v1")
