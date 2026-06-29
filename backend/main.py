@@ -1,0 +1,43 @@
+"""
+Plataforma Herrería Aluminio - FastAPI Backend
+"""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
+import os
+
+app = FastAPI(
+    title="Plataforma Herrería Aluminio",
+    description="API REST para gestión de proyectos, cotizaciones y producción",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+async def root():
+    return {
+        "name": "Plataforma Herrería Aluminio API",
+        "version": "1.0.0",
+        "status": "running",
+        "docs": "/docs"
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# TODO: Incluir routers en Sprint 1
+# from app.api.v1 import auth, users, projects
+# app.include_router(auth.router, prefix="/api/v1")
+# app.include_router(users.router, prefix="/api/v1")
+# app.include_router(projects.router, prefix="/api/v1")
