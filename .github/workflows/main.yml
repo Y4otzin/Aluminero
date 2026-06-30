@@ -93,21 +93,21 @@ jobs:
           echo "JWT_SECRET_KEY=github_action_temp_secret" >> .env
           echo "APP_ENV=testing" >> .env
 
-      # Construir las imágenes con docker-compose
+      # Construir las imágenes con docker compose
       - name: Build Docker images
         run: |
-          docker-compose -f docker-compose.yml build
+          docker compose -f docker-compose.yml build
 
       # Levantar los contenedores en segundo plano
       - name: Start containers
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker compose -f docker-compose.yml up -d
 
       # Esperar a que los servicios estén listos
       - name: Wait for services
         run: |
           sleep 10
-          docker-compose -f docker-compose.yml ps
+          docker compose -f docker-compose.yml ps
 
       # Verificar que el backend responda (ejemplo)
       - name: Check backend health
@@ -117,7 +117,7 @@ jobs:
       # Mostrar logs si algo falla (para depuración)
       - name: Show logs on failure
         if: failure()
-        run: docker-compose -f docker-compose.yml logs
+        run: docker compose -f docker-compose.yml logs
 
   # ==============================================
   # JOB 3: Despliegue (opcional, pero muy útil)
