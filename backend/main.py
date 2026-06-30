@@ -38,3 +38,6 @@ async def health_check():
 
 from app.api.v1 import sketch
 app.include_router(sketch.router, prefix="/api/v1")
+
+from app.api.v1.auth import router as auth_router
+app.include_router(auth_router)

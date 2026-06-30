@@ -1,19 +1,22 @@
-import type { Metadata } from 'next'
-import './globals.css'
+import type { Metadata } from 'next';
+import { Providers } from '@/components/Providers';
+import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Plataforma Herrería Aluminio',
   description: 'Sistema integral de cotización y producción',
-}
+};
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body className="antialiased">
+        <Providers>{children}</Providers>
+      </body>
     </html>
-  )
+  );
 }
