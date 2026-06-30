@@ -97,7 +97,7 @@ class GlassType(Base):
 class Hardware(Base):
     """Catálogo de herrajes y accesorios (manijas, bisagras, cerraduras, etc.)."""
 
-    __tablename__ = "hardware_items"
+    __tablename__ = "hardware"
 
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(100), unique=True, nullable=False, index=True)

@@ -85,6 +85,9 @@ class Project(Base):
     # Relación con fotos de evidencia
     photos = relationship("Photo", back_populates="project", cascade="all, delete-orphan")
 
+    # Relación con presupuestos
+    budgets = relationship("Budget", back_populates="project", cascade="all, delete-orphan")
+
     def calculate_area(self) -> float:
         """Calcula area_m2 = height_m * width_m * quantity."""
         self.area_m2 = round(self.height_m * self.width_m * self.quantity, 4)
