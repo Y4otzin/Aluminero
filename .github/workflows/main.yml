@@ -120,28 +120,22 @@ jobs:
         run: docker compose -f docker-compose.yml logs
 
   # ==============================================
-  # JOB 3: Despliegue (opcional, pero muy útil)
+  # JOB 3: Despliegue (desactivado — sin servidor aún)
   # ==============================================
-  deploy:
-    name: Deploy to Server
-    runs-on: ubuntu-latest
-    needs: docker-build  # Depende del job anterior
-    # Solo se ejecuta en la rama principal y si es un push (no en PRs)
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    # environment: production  # Puedes configurar un entorno en GitHub
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Ejemplo de despliegue usando rsync sobre SSH
-      - name: Deploy via SSH
-        uses: easingthemes/ssh-deploy@main
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          ARGS: "-rlgoDzvc -i --delete"
-          SOURCE: "./"
-          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-          REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: ${{ secrets.REMOTE_TARGET }}
-        # Nota: Este action es un ejemplo. Asegúrate de adaptar el método de despliegue a tu caso.
+  # deploy:
+  #   name: Deploy to Server
+  #   runs-on: ubuntu-latest
+  #   needs: docker-build
+  #   if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #     - name: Deploy via SSH
+  #       uses: easingthemes/ssh-deploy@main
+  #       env:
+  #         SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+  #         ARGS: "-rlgoDzvc -i --delete"
+  #         SOURCE: "./"
+  #         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+  #         REMOTE_USER: ${{ secrets.REMOTE_USER }}
+  #         TARGET: ${{ secrets.REMOTE_TARGET }}
