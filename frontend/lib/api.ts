@@ -415,6 +415,178 @@ export async function deletePhoto(
   );
 }
 
+// ─── Tipos de Catálogos ────────────────────────────────
+
+type CatalogType = 'aluminum-series' | 'finishes' | 'glass-types' | 'hardware';
+
+interface CatalogItem {
+  id: string;
+  name: string;
+  price?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface CreateCatalogItem {
+  name: string;
+  price?: number | null;
+}
+
+interface UpdateCatalogItem {
+  name?: string;
+  price?: number | null;
+}
+
+// ─── Endpoints de Catálogos ────────────────────────────
+
+function catalogUrl(type: CatalogType): string {
+  return `/api/v1/catalogs/${type}`;
+}
+
+/** Obtener todos los items de un catálogo */
+async function getCatalogItems(
+  token: string,
+  type: CatalogType
+): Promise<CatalogItem[]> {
+  return authApiFetch<CatalogItem[]>(catalogUrl(type), token);
+}
+
+/** Crear un item de catálogo (solo admin) */
+async function createCatalogItem(
+  token: string,
+  type: CatalogType,
+  data: CreateCatalogItem
+): Promise<CatalogItem> {
+  return authApiFetch<CatalogItem>(catalogUrl(type), token, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/** Actualizar un item de catálogo (solo admin) */
+async function updateCatalogItem(
+  token: string,
+  type: CatalogType,
+  id: string,
+  data: UpdateCatalogItem
+): Promise<CatalogItem> {
+  return authApiFetch<CatalogItem>(`${catalogUrl(type)}/${id}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/** Eliminar un item de catálogo (solo admin) */
+async function deleteCatalogItem(
+  token: string,
+  type: CatalogType,
+  id: string
+): Promise<{ message: string }> {
+  return authApiFetch<{ message: string }>(`${catalogUrl(type)}/${id}`, token, {
+    method: 'DELETE',
+  });
+}
+
+// ─── Catálogo: Series de Aluminio ──────────────────────
+
+export function getAluminumSeries(token: string): Promise<CatalogItem[]> {
+  return getCatalogItems(token, 'aluminum-series');
+}
+export function createAluminumSeries(
+  token: string,
+  data: CreateCatalogItem
+): Promise<CatalogItem> {
+  return createCatalogItem(token, 'aluminum-series', data);
+}
+export function updateAluminumSeries(
+  token: string,
+  id: string,
+  data: UpdateCatalogItem
+): Promise<CatalogItem> {
+  return updateCatalogItem(token, 'aluminum-series', id, data);
+}
+export function deleteAluminumSeries(
+  token: string,
+  id: string
+): Promise<{ message: string }> {
+  return deleteCatalogItem(token, 'aluminum-series', id);
+}
+
+// ─── Catálogo: Acabados ────────────────────────────────
+
+export function getFinishes(token: string): Promise<CatalogItem[]> {
+  return getCatalogItems(token, 'finishes');
+}
+export function createFinish(
+  token: string,
+  data: CreateCatalogItem
+): Promise<CatalogItem> {
+  return createCatalogItem(token, 'finishes', data);
+}
+export function updateFinish(
+  token: string,
+  id: string,
+  data: UpdateCatalogItem
+): Promise<CatalogItem> {
+  return updateCatalogItem(token, 'finishes', id, data);
+}
+export function deleteFinish(
+  token: string,
+  id: string
+): Promise<{ message: string }> {
+  return deleteCatalogItem(token, 'finishes', id);
+}
+
+// ─── Catálogo: Tipos de Vidrio ─────────────────────────
+
+export function getGlassTypes(token: string): Promise<CatalogItem[]> {
+  return getCatalogItems(token, 'glass-types');
+}
+export function createGlassType(
+  token: string,
+  data: CreateCatalogItem
+): Promise<CatalogItem> {
+  return createCatalogItem(token, 'glass-types', data);
+}
+export function updateGlassType(
+  token: string,
+  id: string,
+  data: UpdateCatalogItem
+): Promise<CatalogItem> {
+  return updateCatalogItem(token, 'glass-types', id, data);
+}
+export function deleteGlassType(
+  token: string,
+  id: string
+): Promise<{ message: string }> {
+  return deleteCatalogItem(token, 'glass-types', id);
+}
+
+// ─── Catálogo: Herrajes ────────────────────────────────
+
+export function getHardware(token: string): Promise<CatalogItem[]> {
+  return getCatalogItems(token, 'hardware');
+}
+export function createHardware(
+  token: string,
+  data: CreateCatalogItem
+): Promise<CatalogItem> {
+  return createCatalogItem(token, 'hardware', data);
+}
+export function updateHardware(
+  token: string,
+  id: string,
+  data: UpdateCatalogItem
+): Promise<CatalogItem> {
+  return updateCatalogItem(token, 'hardware', id, data);
+}
+export function deleteHardware(
+  token: string,
+  id: string
+): Promise<{ message: string }> {
+  return deleteCatalogItem(token, 'hardware', id);
+}
+
 export { ApiClientError };
 export type {
   User,
@@ -430,4 +602,8 @@ export type {
   PaginatedResponse,
   ProjectFilters,
   Photo,
+  CatalogItem,
+  CreateCatalogItem,
+  UpdateCatalogItem,
+  CatalogType,
 };

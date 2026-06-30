@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   ChevronRight,
+  BookOpen,
 } from 'lucide-react';
 
 interface NavItem {
@@ -101,6 +102,35 @@ export default function DashboardLayout({
               </Link>
             );
           })}
+
+          {/* ─── Sección Admin ──────────────────── */}
+          {user?.role === 'admin' && (
+            <>
+              <div className="pt-3 mb-1">
+                <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Administración
+                </p>
+              </div>
+              <Link
+                href="/dashboard/admin/catalogs"
+                className={`
+                  flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium
+                  transition-colors duration-150
+                  ${
+                    isActive('/dashboard/admin/catalogs')
+                      ? 'bg-[#1e40af]/10 text-[#1e40af]'
+                      : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  }
+                `}
+              >
+                <BookOpen className="w-5 h-5" />
+                <span>Catálogos</span>
+                {isActive('/dashboard/admin/catalogs') && (
+                  <ChevronRight className="w-4 h-4 ml-auto text-[#1e40af]" />
+                )}
+              </Link>
+            </>
+          )}
         </nav>
 
         {/* Footer del sidebar */}

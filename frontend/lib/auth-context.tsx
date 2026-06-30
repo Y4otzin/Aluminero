@@ -19,6 +19,7 @@ interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isAdmin: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -147,6 +148,7 @@ function AuthProvider({ children }: AuthProviderProps) {
     token,
     isAuthenticated: !!token && !!user,
     isLoading,
+    isAdmin: user?.role === 'admin',
     login,
     register,
     logout,
