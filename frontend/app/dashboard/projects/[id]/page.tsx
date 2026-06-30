@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import PhotoUploader from '@/components/PhotoUploader';
 import PhotoGallery from '@/components/PhotoGallery';
+import BudgetForm from '@/components/BudgetForm';
+import SketchViewer from '@/components/SketchViewer';
 import {
   ArrowLeft,
   Edit,
@@ -25,9 +27,11 @@ import {
   User,
   Camera,
   ImageIcon,
+  DollarSign,
+  Palette,
 } from 'lucide-react';
 
-type TabId = 'details' | 'photos';
+type TabId = 'details' | 'budget' | 'photos' | 'sketch';
 
 interface Tab {
   id: TabId;
@@ -40,6 +44,16 @@ const TABS: Tab[] = [
     id: 'details',
     label: 'Detalles',
     icon: <FileText className="w-4 h-4" />,
+  },
+  {
+    id: 'budget',
+    label: 'Presupuesto',
+    icon: <DollarSign className="w-4 h-4" />,
+  },
+  {
+    id: 'sketch',
+    label: 'Boceto',
+    icon: <Palette className="w-4 h-4" />,
   },
   {
     id: 'photos',
@@ -561,6 +575,37 @@ export default function ProjectDetailPage() {
                   isLocked={project.is_locked}
                 />
               )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ─── Tab: Presupuesto ────────────────────────── */}
+      {activeTab === 'budget' && <BudgetForm project={project} />}
+      {activeTab === 'sketch' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5 text-[#1e40af]" />
+                Boceto del diseño
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-500 mb-4">
+                Vista preliminar del diseño generada automáticamente a partir de las dimensiones del proyecto. Sin dependencia de APIs externas.
+              </p>
+              <SketchViewer
+                canvasState={[
+                  { type: 'rect', x: 10, y: 10, width: 300, height: 200, stroke: '#1e40af', fill: '#e0e7ff', roughness: 2 },
+                  { type: 'line', x1: 10, y1: 210, x2: 310, y2: 210, stroke: '#374151', stroke_width: 2, roughness: 2 },
+                  { type: 'text', x: 20, y: 240, text: `Proyecto: ${project.client_name}`, stroke: '#374151', stroke_width: 1 },
+                  { type: 'text', x: 20, y: 260, text: `${project.width_m} m × ${project.height_m} m × ${project.quantity} uds = ${(project.width_m * project.height_m * project.quantity).toFixed(2)} m²`, stroke: '#6b7280', stroke_width: 0.5 },
+                ]}
+                width={500}
+                height={400}
+                style="hand-drawn"
+              />
             </CardContent>
           </Card>
         </div>

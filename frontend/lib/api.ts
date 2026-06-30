@@ -165,7 +165,6 @@ interface Project {
   created_at: string;
   updated_at: string;
 }
-}
 
 interface CreateProjectData {
   client_name: string;
@@ -666,7 +665,10 @@ export async function getCurrentBudget(
     headers: { 'Authorization': `Bearer ${token}` },
   });
   if (!resp.ok) {
-    if (resp.status === 404) throw new ApiClientError({ detail: 'Sin presupuesto' }, 404);
+    if (resp.status === 404) {
+      const errBody = await resp.json().catch(() => ({ detail: 'Sin presupuesto' }));
+      throw new ApiClientError(errBody.detail || 'Sin presupuesto', 404);
+    }
     throw new ApiClientError(await resp.json(), resp.status);
   }
   return resp.json();
