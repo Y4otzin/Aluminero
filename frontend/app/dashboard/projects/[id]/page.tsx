@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getProject } from '@/lib/api';
-import type { Project } from '@/lib/api';
+import { getProject, getPhotos, uploadPhotos, deletePhoto } from '@/lib/api';
+import type { Project, Photo } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import PhotoUploader from '@/components/PhotoUploader';
+import PhotoGallery from '@/components/PhotoGallery';
 import {
   ArrowLeft,
   Edit,
@@ -21,7 +23,30 @@ import {
   FileText,
   Lock,
   User,
+  Camera,
+  ImageIcon,
 } from 'lucide-react';
+
+type TabId = 'details' | 'photos';
+
+interface Tab {
+  id: TabId;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const TABS: Tab[] = [
+  {
+    id: 'details',
+    label: 'Detalles',
+    icon: <FileText className="w-4 h-4" />,
+  },
+  {
+    id: 'photos',
+    label: 'Fotos',
+    icon: <Camera className="w-4 h-4" />,
+  },
+];
 
 function formatDate(dateStr: string): string {
   try {
@@ -48,10 +73,20 @@ export default function ProjectDetailPage() {
   const { token, isLoading: authLoading } = useAuth();
   const id = params.id as string;
 
+  // ─── Tab state ───────────────────────────────────────
+  const [activeTab, setActiveTab] = useState<TabId>('details');
+
+  // ─── Project state ───────────────────────────────────
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // ─── Photos state ────────────────────────────────────
+  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [photosError, setPhotosError] = useState<string | null>(null);
+
+  // ─── Load project ────────────────────────────────────
   useEffect(() => {
     if (!token) return;
 
@@ -68,6 +103,57 @@ export default function ProjectDetailPage() {
       .finally(() => setLoading(false));
   }, [token, id]);
 
+  // ─── Load photos (only when photos tab is active) ────
+  const loadPhotos = useCallback(async () => {
+    if (!token) return;
+    setPhotosLoading(true);
+    setPhotosError(null);
+    try {
+      const data = await getPhotos(token, id);
+      setPhotos(data);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al cargar las fotos.';
+      setPhotosError(msg);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [token, id]);
+
+  useEffect(() => {
+    if (activeTab === 'photos') {
+      loadPhotos();
+    }
+  }, [activeTab, loadPhotos]);
+
+  // ─── Photo upload handler ────────────────────────────
+  const handleUpload = useCallback(
+    async (files: File[]) => {
+      if (!token) throw new Error('No autenticado');
+      await uploadPhotos(token, id, files);
+      // Refresh gallery after upload
+      await loadPhotos();
+    },
+    [token, id, loadPhotos]
+  );
+
+  // ─── Photo delete handler ────────────────────────────
+  const handleDeletePhoto = useCallback(
+    async (photoId: string) => {
+      if (!token) return;
+      try {
+        await deletePhoto(token, photoId);
+        setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : 'Error al eliminar la foto.';
+        setPhotosError(msg);
+      }
+    },
+    [token]
+  );
+
+  // ─── Loading state ───────────────────────────────────
   if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -81,6 +167,7 @@ export default function ProjectDetailPage() {
     );
   }
 
+  // ─── Error state ─────────────────────────────────────
   if (error) {
     return (
       <div className="space-y-4">
@@ -124,6 +211,7 @@ export default function ProjectDetailPage() {
   if (!project) return null;
 
   const areaM2 = calculateArea(project.height_m, project.width_m, project.quantity);
+  const photoCount = photos.length;
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -178,199 +266,305 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* ─── Columna izquierda: datos principales ─── */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Datos del cliente */}
+      {/* ─── Tabs ──────────────────────────────────── */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {TABS.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+                transition-all duration-200
+                ${
+                  isActive
+                    ? 'bg-white text-[#1e40af] shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                }
+              `}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+              {tab.id === 'photos' && photoCount > 0 && (
+                <span className={`
+                  inline-flex items-center justify-center min-w-[20px] h-5 px-1.5
+                  rounded-full text-[11px] font-semibold
+                  ${isActive ? 'bg-[#1e40af] text-white' : 'bg-gray-200 text-gray-600'}
+                `}>
+                  {photoCount}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ─── Tab: Detalles ─────────────────────────── */}
+      {activeTab === 'details' && (
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Columna izquierda: datos principales */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Datos del cliente */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-[#1e40af]" />
+                  Datos del cliente
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                      Nombre
+                    </dt>
+                    <dd className="text-sm font-medium text-gray-900">
+                      {project.client_name}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5" />
+                      Correo
+                    </dt>
+                    <dd className="text-sm text-gray-700">
+                      <a
+                        href={`mailto:${project.client_email}`}
+                        className="hover:text-[#1e40af] transition-colors"
+                      >
+                        {project.client_email}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5" />
+                      Teléfono
+                    </dt>
+                    <dd className="text-sm text-gray-700">
+                      <a
+                        href={`tel:${project.client_phone}`}
+                        className="hover:text-[#1e40af] transition-colors"
+                      >
+                        {project.client_phone}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Creado
+                    </dt>
+                    <dd className="text-sm text-gray-700">
+                      {formatDate(project.created_at)}
+                    </dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+
+            {/* Detalles del proyecto */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-[#1e40af]" />
+                  Detalles del proyecto
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                      Tipo de proyecto
+                    </dt>
+                    <dd className="text-sm font-medium text-gray-900">
+                      {project.project_type}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                      Cantidad
+                    </dt>
+                    <dd className="text-sm text-gray-700 flex items-center gap-1.5">
+                      <Hash className="w-3.5 h-3.5 text-gray-400" />
+                      {project.quantity} unidad{project.quantity !== 1 ? 'es' : ''}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                      Alto
+                    </dt>
+                    <dd className="text-sm text-gray-700">
+                      {project.height_m.toFixed(2)} m
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                      Ancho
+                    </dt>
+                    <dd className="text-sm text-gray-700">
+                      {project.width_m.toFixed(2)} m
+                    </dd>
+                  </div>
+                </dl>
+
+                {/* Área calculada */}
+                <div className="mt-6 flex items-center gap-3 p-4 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-lg">
+                  <div className="w-10 h-10 rounded-lg bg-[#1e40af]/10 flex items-center justify-center flex-shrink-0">
+                    <Calculator className="w-5 h-5 text-[#1e40af]" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Área total
+                    </p>
+                    <p className="text-2xl font-bold text-[#1e40af]">
+                      {areaM2} m²
+                    </p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {project.height_m.toFixed(2)} m × {project.width_m.toFixed(2)} m ×{' '}
+                      {project.quantity} unidad{project.quantity !== 1 ? 'es' : ''}
+                    </p>
+                  </div>
+                </div>
+
+                {project.notes && (
+                  <div className="mt-6">
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5" />
+                      Notas
+                    </dt>
+                    <dd className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4 whitespace-pre-wrap">
+                      {project.notes}
+                    </dd>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Columna derecha: metadata */}
+          <div className="space-y-4">
+            {/* Estado */}
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                  Estado actual
+                </p>
+                <StatusBadge status={project.status} />
+              </CardContent>
+            </Card>
+
+            {/* Metadata */}
+            <Card>
+              <CardContent className="py-4">
+                <dl className="space-y-3">
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      ID del proyecto
+                    </dt>
+                    <dd className="text-sm text-gray-700 font-mono mt-0.5 break-all">
+                      {project.id}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Última actualización
+                    </dt>
+                    <dd className="text-sm text-gray-700 mt-0.5">
+                      {formatDate(project.updated_at)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Bloqueado
+                    </dt>
+                    <dd className="text-sm text-gray-700 mt-0.5 flex items-center gap-1.5">
+                      {project.is_locked ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5 text-amber-600" />
+                          <span className="text-amber-700 font-medium">Sí</span>
+                        </>
+                      ) : (
+                        <span className="text-gray-500">No</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Fotos
+                    </dt>
+                    <dd className="text-sm text-gray-700 mt-0.5 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-gray-400" />
+                      <span>{photoCount} foto{photoCount !== 1 ? 's' : ''}</span>
+                    </dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Tab: Fotos ────────────────────────────── */}
+      {activeTab === 'photos' && (
+        <div className="space-y-6">
+          {/* Upload section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5 text-[#1e40af]" />
-                Datos del cliente
+                <Camera className="w-5 h-5 text-[#1e40af]" />
+                Subir fotos
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                    Nombre
-                  </dt>
-                  <dd className="text-sm font-medium text-gray-900">
-                    {project.client_name}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5" />
-                    Correo
-                  </dt>
-                  <dd className="text-sm text-gray-700">
-                    <a
-                      href={`mailto:${project.client_email}`}
-                      className="hover:text-[#1e40af] transition-colors"
-                    >
-                      {project.client_email}
-                    </a>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <Phone className="w-3.5 h-3.5" />
-                    Teléfono
-                  </dt>
-                  <dd className="text-sm text-gray-700">
-                    <a
-                      href={`tel:${project.client_phone}`}
-                      className="hover:text-[#1e40af] transition-colors"
-                    >
-                      {project.client_phone}
-                    </a>
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Creado
-                  </dt>
-                  <dd className="text-sm text-gray-700">
-                    {formatDate(project.created_at)}
-                  </dd>
-                </div>
-              </dl>
+              <PhotoUploader
+                onUpload={handleUpload}
+                isLocked={project.is_locked}
+              />
             </CardContent>
           </Card>
 
-          {/* Detalles del proyecto */}
+          {/* Gallery section */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Wrench className="w-5 h-5 text-[#1e40af]" />
-                Detalles del proyecto
+                <ImageIcon className="w-5 h-5 text-[#1e40af]" />
+                Galería
+                {photoCount > 0 && (
+                  <span className="text-sm font-normal text-gray-500">
+                    ({photoCount} foto{photoCount !== 1 ? 's' : ''})
+                  </span>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                    Tipo de proyecto
-                  </dt>
-                  <dd className="text-sm font-medium text-gray-900">
-                    {project.project_type}
-                  </dd>
+              {photosLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-6 h-6 border-2 border-[#1e40af] border-t-transparent rounded-full animate-spin" />
                 </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                    Cantidad
-                  </dt>
-                  <dd className="text-sm text-gray-700 flex items-center gap-1.5">
-                    <Hash className="w-3.5 h-3.5 text-gray-400" />
-                    {project.quantity} unidad{project.quantity !== 1 ? 'es' : ''}
-                  </dd>
+              ) : photosError ? (
+                <div className="text-center py-8">
+                  <p className="text-red-600 text-sm mb-4">{photosError}</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadPhotos}
+                  >
+                    Reintentar
+                  </Button>
                 </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                    Alto
-                  </dt>
-                  <dd className="text-sm text-gray-700">
-                    {project.height_m.toFixed(2)} m
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-                    Ancho
-                  </dt>
-                  <dd className="text-sm text-gray-700">
-                    {project.width_m.toFixed(2)} m
-                  </dd>
-                </div>
-              </dl>
-
-              {/* Área calculada */}
-              <div className="mt-6 flex items-center gap-3 p-4 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-lg">
-                <div className="w-10 h-10 rounded-lg bg-[#1e40af]/10 flex items-center justify-center flex-shrink-0">
-                  <Calculator className="w-5 h-5 text-[#1e40af]" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Área total
-                  </p>
-                  <p className="text-2xl font-bold text-[#1e40af]">
-                    {areaM2} m²
-                  </p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {project.height_m.toFixed(2)} m × {project.width_m.toFixed(2)} m ×{' '}
-                    {project.quantity} unidad{project.quantity !== 1 ? 'es' : ''}
-                  </p>
-                </div>
-              </div>
-
-              {project.notes && (
-                <div className="mt-6">
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <FileText className="w-3.5 h-3.5" />
-                    Notas
-                  </dt>
-                  <dd className="text-sm text-gray-700 bg-gray-50 rounded-lg p-4 whitespace-pre-wrap">
-                    {project.notes}
-                  </dd>
-                </div>
+              ) : (
+                <PhotoGallery
+                  photos={photos}
+                  onDelete={handleDeletePhoto}
+                  isLocked={project.is_locked}
+                />
               )}
             </CardContent>
           </Card>
         </div>
-
-        {/* ─── Columna derecha: metadata ───────────── */}
-        <div className="space-y-4">
-          {/* Estado */}
-          <Card>
-            <CardContent className="py-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
-                Estado actual
-              </p>
-              <StatusBadge status={project.status} />
-            </CardContent>
-          </Card>
-
-          {/* Metadata */}
-          <Card>
-            <CardContent className="py-4">
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID del proyecto
-                  </dt>
-                  <dd className="text-sm text-gray-700 font-mono mt-0.5 break-all">
-                    {project.id}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Última actualización
-                  </dt>
-                  <dd className="text-sm text-gray-700 mt-0.5">
-                    {formatDate(project.updated_at)}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Bloqueado
-                  </dt>
-                  <dd className="text-sm text-gray-700 mt-0.5 flex items-center gap-1.5">
-                    {project.is_locked ? (
-                      <>
-                        <Lock className="w-3.5 h-3.5 text-amber-600" />
-                        <span className="text-amber-700 font-medium">Sí</span>
-                      </>
-                    ) : (
-                      <span className="text-gray-500">No</span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -295,6 +295,126 @@ export async function getWorkTypes(
   return authApiFetch<WorkType[]>('/api/v1/work-types', token);
 }
 
+// ─── Tipos de Fotos ────────────────────────────────────
+
+interface Photo {
+  id: string;
+  project_id: string;
+  url: string;
+  order: number;
+  exif_stripped: boolean;
+  created_at: string;
+}
+
+// ─── Fetch autenticado (multipart) ─────────────────────
+
+async function authApiFetchFormData<T>(
+  endpoint: string,
+  token: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${API_URL}${endpoint}`;
+  const config: RequestInit = {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...options.headers,
+    },
+    ...options,
+  };
+
+  const response = await fetch(url, config);
+
+  if (!response.ok) {
+    let errorData: ApiError;
+    try {
+      errorData = await response.json();
+    } catch {
+      errorData = { detail: 'Error de conexión con el servidor' };
+    }
+    throw new ApiClientError(
+      errorData.detail || 'Ha ocurrido un error inesperado',
+      response.status,
+      errorData.errors
+    );
+  }
+
+  return response.json();
+}
+
+// ─── Endpoints de Fotos ─────────────────────────────────
+
+/**
+ * Subir múltiples fotos a un proyecto.
+ * Usa FormData para enviar los archivos.
+ */
+export async function uploadPhotos(
+  token: string,
+  projectId: string,
+  files: File[]
+): Promise<Photo[]> {
+  const formData = new FormData();
+  for (const file of files) {
+    formData.append('files', file);
+  }
+
+  return authApiFetchFormData<Photo[]>(
+    `/api/v1/projects/${projectId}/photos`,
+    token,
+    {
+      method: 'POST',
+      body: formData,
+    }
+  );
+}
+
+/**
+ * Obtener todas las fotos de un proyecto.
+ */
+export async function getPhotos(
+  token: string,
+  projectId: string
+): Promise<Photo[]> {
+  return authApiFetch<Photo[]>(
+    `/api/v1/projects/${projectId}/photos`,
+    token
+  );
+}
+
+/**
+ * Reordenar fotos de un proyecto.
+ * @param orderedIds Array de IDs ordenados según la nueva posición.
+ */
+export async function reorderPhotos(
+  token: string,
+  projectId: string,
+  orderedIds: string[]
+): Promise<{ message: string }> {
+  return authApiFetch<{ message: string }>(
+    `/api/v1/projects/${projectId}/photos/reorder`,
+    token,
+    {
+      method: 'PUT',
+      body: JSON.stringify({ ordered_ids: orderedIds }),
+    }
+  );
+}
+
+/**
+ * Eliminar una foto por su ID.
+ */
+export async function deletePhoto(
+  token: string,
+  photoId: string
+): Promise<{ message: string }> {
+  return authApiFetch<{ message: string }>(
+    `/api/v1/photos/${photoId}`,
+    token,
+    {
+      method: 'DELETE',
+    }
+  );
+}
+
 export { ApiClientError };
 export type {
   User,
@@ -309,4 +429,5 @@ export type {
   WorkType,
   PaginatedResponse,
   ProjectFilters,
+  Photo,
 };
