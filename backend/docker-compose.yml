@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: aluminio_postgres
+    environment:
+      POSTGRES_USER: aluminio
+      POSTGRES_PASSWORD: aluminio_password_123
+      POSTGRES_DB: aluminio_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aluminio"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: .
+    container_name: plataforma-herreria-aluminio-backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://aluminio:aluminio_password_123@db:5432/aluminio_db
+      APP_ENV: development
+      APP_SECRET_KEY: dev-secret-key-change-in-production
+      JWT_SECRET_KEY: dev-jwt-secret-key-change-in-production
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && 
+             python main.py"
+
+volumes:
+  postgres_data:

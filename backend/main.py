@@ -41,3 +41,15 @@ app.include_router(sketch.router, prefix="/api/v1")
 
 from app.api.v1.auth import router as auth_router
 app.include_router(auth_router)
+
+from app.api.v1.projects.router import router as projects_router
+app.include_router(projects_router)
+
+from app.api.v1.photos.router import router as photos_router
+app.include_router(photos_router)
+
+from app.api.v1.catalogs.router import router as catalogs_router
+app.include_router(catalogs_router)
+
+from app.api.v1.budget.router import router as budget_router
+app.include_router(budget_router)
