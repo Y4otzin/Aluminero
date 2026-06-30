@@ -2,9 +2,8 @@
 
 import React from 'react';
 
-interface CardProps {
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   shadow?: 'none' | 'sm' | 'md' | 'lg';
 }
@@ -28,6 +27,7 @@ const Card: React.FC<CardProps> = ({
   className = '',
   padding = 'md',
   shadow = 'md',
+  ...rest
 }) => {
   return (
     <div
@@ -39,6 +39,7 @@ const Card: React.FC<CardProps> = ({
         ${shadowClasses[shadow]}
         ${className}
       `}
+      {...rest}
     >
       {children}
     </div>
