@@ -146,5 +146,167 @@ export async function getMe(token: string): Promise<User> {
   });
 }
 
+// ─── Tipos de Proyectos ──────────────────────────────────
+
+interface Project {
+  id: string;
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  project_type: string;
+  height_m: number;
+  width_m: number;
+  quantity: number;
+  area_m2: number;
+  notes: string | null;
+  status: string;
+  is_locked: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CreateProjectData {
+  client_name: string;
+  client_email: string;
+  client_phone: string;
+  project_type: string;
+  height_m: number;
+  width_m: number;
+  quantity: number;
+  notes?: string;
+}
+
+interface UpdateProjectData {
+  client_name?: string;
+  client_email?: string;
+  client_phone?: string;
+  project_type?: string;
+  height_m?: number;
+  width_m?: number;
+  quantity?: number;
+  notes?: string;
+}
+
+interface WorkType {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  pages: number;
+}
+
+interface ProjectFilters {
+  status?: string;
+  type?: string;
+  search?: string;
+  page?: number;
+  size?: number;
+}
+
+// ─── Fetch autenticado (helper) ─────────────────────────
+
+async function authApiFetch<T>(
+  endpoint: string,
+  token: string,
+  options: RequestInit = {}
+): Promise<T> {
+  return apiFetch<T>(endpoint, {
+    ...options,
+    headers: {
+      ...options.headers,
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+// ─── Endpoints de Proyectos ─────────────────────────────
+
+/**
+ * Obtener lista de proyectos con filtros y paginación.
+ */
+export async function getProjects(
+  token: string,
+  filters: ProjectFilters = {}
+): Promise<PaginatedResponse<Project>> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.type) params.set('type', filters.type);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.size) params.set('size', String(filters.size));
+
+  const query = params.toString();
+  return authApiFetch<PaginatedResponse<Project>>(
+    `/api/v1/projects${query ? `?${query}` : ''}`,
+    token
+  );
+}
+
+/**
+ * Obtener un proyecto por su ID.
+ */
+export async function getProject(
+  token: string,
+  id: string
+): Promise<Project> {
+  return authApiFetch<Project>(`/api/v1/projects/${id}`, token);
+}
+
+/**
+ * Crear un nuevo proyecto.
+ */
+export async function createProject(
+  token: string,
+  data: CreateProjectData
+): Promise<Project> {
+  return authApiFetch<Project>('/api/v1/projects', token, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Actualizar un proyecto existente.
+ */
+export async function updateProject(
+  token: string,
+  id: string,
+  data: UpdateProjectData
+): Promise<Project> {
+  return authApiFetch<Project>(`/api/v1/projects/${id}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Obtener catálogo de tipos de trabajo.
+ */
+export async function getWorkTypes(
+  token: string
+): Promise<WorkType[]> {
+  return authApiFetch<WorkType[]>('/api/v1/work-types', token);
+}
+
 export { ApiClientError };
-export type { User, AuthTokens, AuthResponse, RegisterResponse, ForgotPasswordResponse, ResetPasswordResponse };
+export type {
+  User,
+  AuthTokens,
+  AuthResponse,
+  RegisterResponse,
+  ForgotPasswordResponse,
+  ResetPasswordResponse,
+  Project,
+  CreateProjectData,
+  UpdateProjectData,
+  WorkType,
+  PaginatedResponse,
+  ProjectFilters,
+};
