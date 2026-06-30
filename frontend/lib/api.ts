@@ -158,12 +158,13 @@ interface Project {
   width_m: number;
   quantity: number;
   area_m2: number;
-  notes: string | null;
+  notes: string;
   status: string;
   is_locked: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
+}
 }
 
 interface CreateProjectData {
@@ -587,6 +588,138 @@ export function deleteHardware(
   return deleteCatalogItem(token, 'hardware', id);
 }
 
+// ── Budget & Presupuestos ─────────────────────────────────
+
+interface BudgetData {
+  aluminum_series_id: string;
+  finish_id: string;
+  glass_type_id: string;
+  hardware_ids: string[];
+  height_m: number;
+  width_m: number;
+  quantity: number;
+  discount_pct?: number;
+  notes?: string;
+}
+
+interface Budget {
+  id: string;
+  project_id: string;
+  version: number;
+  aluminum_series_id: string | null;
+  finish_id: string | null;
+  glass_type_id: string | null;
+  hardware_ids: string[];
+  height_m: number;
+  width_m: number;
+  quantity: number;
+  area_m2: number;
+  material_cost: number;
+  labor_cost: number;
+  subtotal: number;
+  tax: number;
+  total: number;
+  discount_pct: number;
+  notes: string | null;
+  is_current: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+interface BudgetVersionSummary {
+  version: number;
+  total: number;
+  is_current: boolean;
+  created_at: string;
+}
+
+interface LaborCost {
+  id: string;
+  job_type: string;
+  cost_per_m2: number;
+}
+
+/** Crear o actualizar presupuesto (nueva versión) */
+export async function createBudget(
+  token: string,
+  projectId: string,
+  data: BudgetData
+): Promise<Budget> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/budget`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) throw new ApiClientError(await resp.json(), resp.status);
+  return resp.json();
+}
+
+/** Obtener presupuesto actual del proyecto */
+export async function getCurrentBudget(
+  token: string,
+  projectId: string
+): Promise<Budget> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/budget`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    if (resp.status === 404) throw new ApiClientError({ detail: 'Sin presupuesto' }, 404);
+    throw new ApiClientError(await resp.json(), resp.status);
+  }
+  return resp.json();
+}
+
+/** Obtener versiones del presupuesto */
+export async function getBudgetVersions(
+  token: string,
+  projectId: string
+): Promise<{ versions: BudgetVersionSummary[] }> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/budget/versions`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) throw new ApiClientError(await resp.json(), resp.status);
+  return resp.json();
+}
+
+/** Obtener una versión específica */
+export async function getBudgetVersion(
+  token: string,
+  projectId: string,
+  version: number
+): Promise<Budget> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/budget/${version}`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) throw new ApiClientError(await resp.json(), resp.status);
+  return resp.json();
+}
+
+/** Establecer una versión como actual */
+export async function setBudgetAsCurrent(
+  token: string,
+  projectId: string,
+  version: number
+): Promise<Budget> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/budget/${version}/set-current`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) throw new ApiClientError(await resp.json(), resp.status);
+  return resp.json();
+}
+
+/** Obtener costos de mano de obra */
+export async function getLaborCosts(token: string): Promise<LaborCost[]> {
+  const resp = await fetch(`${API_URL}/api/v1/labor-costs`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) throw new ApiClientError(await resp.json(), resp.status);
+  return resp.json();
+}
+
 export { ApiClientError };
 export type {
   User,
@@ -606,4 +739,8 @@ export type {
   CreateCatalogItem,
   UpdateCatalogItem,
   CatalogType,
+  Budget,
+  BudgetData,
+  BudgetVersionSummary,
+  LaborCost,
 };

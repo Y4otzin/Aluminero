@@ -50,3 +50,6 @@ app.include_router(photos_router)
 
 from app.api.v1.catalogs.router import router as catalogs_router
 app.include_router(catalogs_router)
+
+from app.api.v1.budget.router import router as budget_router
+app.include_router(budget_router)

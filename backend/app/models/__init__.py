@@ -6,6 +6,7 @@ from app.models.user import Base, User, Session, UserRole
 from app.models.project import Project, WorkType, ProjectStatus
 from app.models.photo import Photo
 from app.models.catalog import AluminumSeries, Finish, GlassType, Hardware
+from app.models.budget import Budget, LaborCost, budget_hardware
 
 __all__ = [
     "Base",
@@ -20,4 +21,7 @@ __all__ = [
     "Finish",
     "GlassType",
     "Hardware",
+    "Budget",
+    "LaborCost",
+    "budget_hardware",
 ]
