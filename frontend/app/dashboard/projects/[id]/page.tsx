@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getProject, getPhotos, uploadPhotos, deletePhoto, getProjectSignatures, requestSignature, getSignatureEvidence, generateQuote, getQuotes, downloadQuotePdf, sendQuoteEmail, regenerateQuote } from '@/lib/api';
-import type { Project, Photo, Quote } from '@/lib/api';
+import { getProject, getPhotos, uploadPhotos, deletePhoto, getProjectSignatures, requestSignature, getSignatureEvidence, generateQuote, getQuotes, downloadQuotePdf, sendQuoteEmail, regenerateQuote, triggerProduction, getProductionOrder, getProductionEvents } from '@/lib/api';
+import type { Project, Photo, Quote, ProductionOrder, ProductionEvent } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -37,14 +37,20 @@ import {
   ExternalLink,
   CheckCircle2,
   XCircle,
+  HardHat,
+  PlayCircle,
+  Clock,
+  UserCheck,
+  AlertTriangle,
 } from 'lucide-react';
 
-type TabId = 'details' | 'budget' | 'photos' | 'sketch' | 'signature' | 'quote';
+type TabId = 'details' | 'budget' | 'photos' | 'sketch' | 'signature' | 'quote' | 'production';
 
 interface Tab {
   id: TabId;
   label: string;
   icon: React.ReactNode;
+  showIf?: (project: Project) => boolean;
 }
 
 const TABS: Tab[] = [
@@ -77,6 +83,13 @@ const TABS: Tab[] = [
     id: 'quote',
     label: 'Cotización',
     icon: <FileText className="w-4 h-4" />,
+  },
+  {
+    id: 'production',
+    label: 'Producción',
+    icon: <HardHat className="w-4 h-4" />,
+    showIf: (p: Project) =>
+      p.status === 'aprobado' || p.status === 'en_produccion' || p.status === 'terminado' || p.status === 'entregado',
   },
 ];
 
@@ -133,6 +146,13 @@ export default function ProjectDetailPage() {
   const [quoteGenerating, setQuoteGenerating] = useState(false);
   const [sendEmailModalOpen, setSendEmailModalOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+
+  // ─── Production state ─────────────────────────────────
+  const [productionOrder, setProductionOrder] = useState<ProductionOrder | null>(null);
+  const [productionEvents, setProductionEvents] = useState<ProductionEvent[]>([]);
+  const [productionLoading, setProductionLoading] = useState(false);
+  const [productionError, setProductionError] = useState<string | null>(null);
+  const [activatingProduction, setActivatingProduction] = useState(false);
 
   // ─── Load project ────────────────────────────────────
   useEffect(() => {
@@ -237,6 +257,58 @@ export default function ProjectDetailPage() {
       setSignaturesError(msg);
     }
   }, [token, project, id, loadSignatures]);
+
+  // ─── Production handlers ──────────────────────────────
+  const loadProduction = useCallback(async () => {
+    if (!token) return;
+    setProductionLoading(true);
+    setProductionError(null);
+    try {
+      // Try to find production order for this project
+      // First attempt: getProductionOrder if we have the order id
+      // Backend should support finding by project
+      const data = await getProductionOrder(token, id);
+      setProductionOrder(data);
+      // Load events
+      const events = await getProductionEvents(token, data.id);
+      setProductionEvents(events);
+    } catch (err: unknown) {
+      // 404 means no production order yet — that's fine
+      const errObj = err as { status?: number; message?: string };
+      if (errObj?.status !== 404) {
+        const msg =
+          err instanceof Error ? err.message : 'Error al cargar producción.';
+        setProductionError(msg);
+      }
+      setProductionOrder(null);
+      setProductionEvents([]);
+    } finally {
+      setProductionLoading(false);
+    }
+  }, [token, id]);
+
+  useEffect(() => {
+    if (activeTab === 'production') {
+      loadProduction();
+    }
+  }, [activeTab, loadProduction]);
+
+  const handleTriggerProduction = useCallback(async () => {
+    if (!token) return;
+    setActivatingProduction(true);
+    setProductionError(null);
+    try {
+      const order = await triggerProduction(token, id);
+      setProductionOrder(order);
+      setProductionEvents([]);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al activar producción.';
+      setProductionError(msg);
+    } finally {
+      setActivatingProduction(false);
+    }
+  }, [token, id]);
 
   const handleCopySignatureLink = useCallback(
     (signatureId: string) => {
@@ -464,8 +536,8 @@ export default function ProjectDetailPage() {
       )}
 
       {/* ─── Tabs ──────────────────────────────────── */}
-      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        {TABS.map((tab) => {
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
+        {TABS.filter((tab) => !tab.showIf || tab.showIf(project)).map((tab) => {
           const isActive = activeTab === tab.id;
           return (
             <button
@@ -982,6 +1054,210 @@ export default function ProjectDetailPage() {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* ─── Tab: Producción ──────────────────────────── */}
+      {activeTab === 'production' && (
+        <div className="space-y-6">
+          {/* Error banner */}
+          {productionError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-700">{productionError}</p>
+            </div>
+          )}
+
+          {/* Loading */}
+          {productionLoading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-6 h-6 border-2 border-[#1e40af] border-t-transparent rounded-full animate-spin" />
+                <p className="text-sm text-gray-500">Cargando producción...</p>
+              </div>
+            </div>
+          )}
+
+          {!productionLoading && !productionOrder && (
+            /* ─── No production order — show trigger button ─── */
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <HardHat className="w-5 h-5 text-[#1e40af]" />
+                  Activar producción
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="p-6 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-xl text-center">
+                  <HardHat className="w-12 h-12 text-[#1e40af]/40 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Proyecto aprobado — listo para producción
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
+                    El proyecto ha sido aprobado. Activa la producción para generar
+                    la orden de trabajo y comenzar el proceso de fabricación.
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="lg"
+                    leftIcon={
+                      activatingProduction ? (
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <PlayCircle className="w-5 h-5" />
+                      )
+                    }
+                    onClick={handleTriggerProduction}
+                    isLoading={activatingProduction}
+                    disabled={activatingProduction}
+                  >
+                    {activatingProduction
+                      ? 'Activando...'
+                      : 'Activar producción'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {!productionLoading && productionOrder && (
+            <>
+              {/* ─── Production order details ─────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <HardHat className="w-5 h-5 text-[#1e40af]" />
+                    Orden de producción
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        N° Orden
+                      </p>
+                      <p className="text-sm font-bold text-gray-900 font-mono">
+                        {productionOrder.order_number}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        Estado
+                      </p>
+                      <StatusBadge
+                        status={
+                          productionOrder.status === 'pending'
+                            ? 'Pendiente'
+                            : productionOrder.status === 'in_progress'
+                              ? 'En Proceso'
+                              : productionOrder.status === 'completed'
+                                ? 'Terminado'
+                                : 'Entregado'
+                        }
+                        size="sm"
+                      />
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        Asignado a
+                      </p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {productionOrder.assigned_user_name || (
+                          <span className="text-amber-600">Sin asignar</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+                        Fecha de creación
+                      </p>
+                      <p className="text-sm text-gray-700">
+                        {new Date(productionOrder.created_at).toLocaleDateString('es-MX', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* ─── Timeline de eventos ────────────────── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-[#1e40af]" />
+                    Timeline de eventos
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {productionEvents.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                      <p className="text-sm text-gray-500">
+                        No hay eventos registrados aún.
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        Los eventos aparecerán a medida que avance la producción.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      {/* Timeline line */}
+                      <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gray-200" />
+
+                      <div className="space-y-6">
+                        {productionEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className="relative flex items-start gap-4"
+                          >
+                            {/* Timeline dot */}
+                            <div className="relative z-10 flex-shrink-0">
+                              <div className="w-6 h-6 rounded-full bg-[#1e40af] flex items-center justify-center">
+                                {event.event_type === 'assigned' ? (
+                                  <UserCheck className="w-3.5 h-3.5 text-white" />
+                                ) : event.event_type === 'status_change' ? (
+                                  <ArrowLeft className="w-3.5 h-3.5 text-white rotate-90" />
+                                ) : (
+                                  <AlertTriangle className="w-3.5 h-3.5 text-white" />
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Event content */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-medium text-gray-900">
+                                  {event.description}
+                                </p>
+                                <span className="text-xs text-gray-400 whitespace-nowrap">
+                                  {new Date(event.created_at).toLocaleDateString(
+                                    'es-MX',
+                                    {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    }
+                                  )}
+                                </span>
+                              </div>
+                              {event.user_name && (
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  por {event.user_name}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       )}
 

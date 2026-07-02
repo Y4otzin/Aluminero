@@ -1019,6 +1019,188 @@ export async function regenerateQuote(
   return resp.json();
 }
 
+// ─── Tipos de Producción ────────────────────────────────
+
+export type ProductionStatus = 'pending' | 'in_progress' | 'completed' | 'delivered';
+
+export interface ProductionOrder {
+  id: string;
+  project_id: string;
+  order_number: string;
+  status: ProductionStatus;
+  assigned_to: string | null;
+  assigned_user_name: string | null;
+  created_at: string;
+  updated_at: string;
+  project: {
+    id: string;
+    client_name: string;
+    client_email: string;
+    project_type: string;
+    height_m: number;
+    width_m: number;
+    quantity: number;
+    status: string;
+  };
+  quote?: {
+    id: string;
+    folio: string;
+    total: number;
+  } | null;
+  signature?: {
+    id: string;
+    signer_name: string;
+    signed_at: string;
+  } | null;
+}
+
+export interface KanbanData {
+  pending: ProductionOrder[];
+  in_progress: ProductionOrder[];
+  completed: ProductionOrder[];
+  delivered: ProductionOrder[];
+}
+
+export interface ProductionEvent {
+  id: string;
+  order_id: string;
+  event_type: string;
+  description: string;
+  user_id: string;
+  user_name: string;
+  created_at: string;
+}
+
+export interface ProductionSummary {
+  pending: number;
+  in_progress: number;
+  completed: number;
+  delivered: number;
+}
+
+// ─── Endpoints de Producción ─────────────────────────────
+
+/**
+ * Activar producción para un proyecto aprobado.
+ */
+export async function triggerProduction(
+  token: string,
+  projectId: string
+): Promise<ProductionOrder> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/projects/${projectId}/trigger-production`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al activar producción' }));
+    throw new ApiClientError(err.detail || 'Error al activar producción', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Obtener lista de órdenes de producción con filtros.
+ */
+export async function getProductionOrders(
+  token: string,
+  filters: { status?: string; page?: number; size?: number } = {}
+): Promise<PaginatedResponse<ProductionOrder>> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.page) params.set('page', String(filters.page));
+  if (filters.size) params.set('size', String(filters.size));
+
+  const query = params.toString();
+  return authApiFetch<PaginatedResponse<ProductionOrder>>(
+    `/api/v1/production/orders${query ? `?${query}` : ''}`,
+    token
+  );
+}
+
+/**
+ * Obtener órdenes de producción agrupadas por estado para el Kanban.
+ */
+export async function getKanban(token: string): Promise<KanbanData> {
+  return authApiFetch<KanbanData>('/api/v1/production/orders/kanban', token);
+}
+
+/**
+ * Obtener detalle de una orden de producción.
+ */
+export async function getProductionOrder(
+  token: string,
+  orderId: string
+): Promise<ProductionOrder> {
+  return authApiFetch<ProductionOrder>(
+    `/api/v1/production/orders/${orderId}`,
+    token
+  );
+}
+
+/**
+ * Asignar una orden de producción a un usuario.
+ */
+export async function assignProductionOrder(
+  token: string,
+  orderId: string,
+  userId: string
+): Promise<ProductionOrder> {
+  return authApiFetch<ProductionOrder>(
+    `/api/v1/production/orders/${orderId}/assign`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: userId }),
+    }
+  );
+}
+
+/**
+ * Actualizar el estado de una orden de producción.
+ */
+export async function updateProductionStatus(
+  token: string,
+  orderId: string,
+  status: ProductionStatus
+): Promise<ProductionOrder> {
+  return authApiFetch<ProductionOrder>(
+    `/api/v1/production/orders/${orderId}/status`,
+    token,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }
+  );
+}
+
+/**
+ * Obtener eventos/timeline de una orden de producción.
+ */
+export async function getProductionEvents(
+  token: string,
+  orderId: string
+): Promise<ProductionEvent[]> {
+  return authApiFetch<ProductionEvent[]>(
+    `/api/v1/production/events/${orderId}`,
+    token
+  );
+}
+
+/**
+ * Obtener resumen de producción (conteo por estado).
+ */
+export async function getProductionSummary(
+  token: string
+): Promise<ProductionSummary> {
+  return authApiFetch<ProductionSummary>(
+    '/api/v1/production/summary',
+    token
+  );
+}
+
 export { ApiClientError };
 export type {
   User,

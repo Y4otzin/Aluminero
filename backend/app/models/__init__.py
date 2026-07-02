@@ -9,6 +9,12 @@ from app.models.catalog import AluminumSeries, Finish, GlassType, Hardware
 from app.models.budget import Budget, LaborCost, budget_hardware
 from app.models.signature import Signature, SignatureEvidence, SignatureStatus
 from app.models.quote import Quote, QuoteHistory, QuoteStatus
+from app.models.production import (
+    ProductionOrder,
+    ProductionOrderStatus,
+    ProductionEvent,
+    ProductionStatusHistory,
+)
 
 __all__ = [
     "Base",
@@ -32,4 +38,8 @@ __all__ = [
     "Quote",
     "QuoteHistory",
     "QuoteStatus",
+    "ProductionOrder",
+    "ProductionOrderStatus",
+    "ProductionEvent",
+    "ProductionStatusHistory",
 ]

@@ -9,6 +9,7 @@ SignatureService: lógica de negocio para firma digital con trazabilidad legal.
 """
 
 import hashlib
+import logging
 from datetime import datetime, timezone
 from typing import List, Optional
 
@@ -25,6 +26,9 @@ from app.schemas.signature import (
     SignatureEvidenceResponse,
     SignatureListResponse,
 )
+from app.services.production_service import ProductionService
+
+logger = logging.getLogger(__name__)
 
 
 class SignatureService:
@@ -167,6 +171,23 @@ class SignatureService:
             "signature",
             f"Firmante: {data.signer_name} ({data.signer_email})",
         )
+
+        # ── Generar orden de producción automáticamente ─────────────
+        try:
+            order = ProductionService.create_order_from_signature(
+                db, signature_id=signature.id
+            )
+            logger.info(
+                f"Orden de producción {order.order_number} generada "
+                f"para proyecto {project.id}"
+            )
+        except Exception as e:
+            # No bloquear la firma si falla la creación de la orden
+            logger.error(
+                f"Error generando orden de producción para firma "
+                f"{signature.id}: {e}",
+                exc_info=True,
+            )
 
         return signature
 

@@ -16,6 +16,7 @@ import {
   BookOpen,
   Settings,
   HelpCircle,
+  HardHat,
 } from 'lucide-react';
 
 interface NavItem {
@@ -34,6 +35,11 @@ const MAIN_NAV_ITEMS: NavItem[] = [
     href: '/dashboard/projects',
     label: 'Proyectos',
     icon: <FolderKanban className="w-5 h-5" />,
+  },
+  {
+    href: '/dashboard/production',
+    label: 'Producción',
+    icon: <HardHat className="w-5 h-5" />,
   },
 ];
 
