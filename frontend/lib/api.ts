@@ -857,6 +857,168 @@ export async function getProjectSignatures(
   return resp.json();
 }
 
+// ─── Tipos de Cotización / Quote ─────────────────────────
+
+export type QuoteStatus = 'draft' | 'generated' | 'sent' | 'signed';
+
+export interface Quote {
+  id: string;
+  project_id: string;
+  budget_version: number;
+  folio: string;
+  file_url?: string | null;
+  status: QuoteStatus;
+  sent_at?: string | null;
+  signed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GenerateQuoteResponse {
+  message: string;
+  quote_id: string;
+  folio: string;
+}
+
+export interface SendQuoteResponse {
+  message: string;
+  sent_at: string;
+}
+
+// ─── Endpoints de Cotización ─────────────────────────
+
+/**
+ * Generar cotización en PDF a partir del presupuesto actual del proyecto.
+ */
+export async function generateQuote(
+  token: string,
+  projectId: string
+): Promise<GenerateQuoteResponse> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/projects/${projectId}/generate-quote`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al generar cotización' }));
+    throw new ApiClientError(err.detail || 'Error al generar cotización', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Obtener lista de cotizaciones generadas para un proyecto.
+ */
+export async function getQuotes(
+  token: string,
+  projectId: string
+): Promise<Quote[]> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/projects/${projectId}/quotes`,
+    {
+      headers: { 'Authorization': `Bearer ${token}` },
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al obtener cotizaciones' }));
+    throw new ApiClientError(err.detail || 'Error al obtener cotizaciones', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Obtener detalle de una cotización por su ID.
+ */
+export async function getQuote(
+  token: string,
+  quoteId: string
+): Promise<Quote> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/quotes/${quoteId}`,
+    {
+      headers: { 'Authorization': `Bearer ${token}` },
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al obtener cotización' }));
+    throw new ApiClientError(err.detail || 'Error al obtener cotización', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Descargar PDF de una cotización. Retorna el blob del archivo.
+ */
+export async function downloadQuotePdf(
+  token: string,
+  quoteId: string
+): Promise<Blob> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/quotes/${quoteId}/download`,
+    {
+      headers: { 'Authorization': `Bearer ${token}` },
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al descargar PDF' }));
+    throw new ApiClientError(err.detail || 'Error al descargar PDF', resp.status);
+  }
+  return resp.blob();
+}
+
+/**
+ * Enviar cotización por email al cliente.
+ */
+export async function sendQuoteEmail(
+  token: string,
+  quoteId: string,
+  email?: string
+): Promise<SendQuoteResponse> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/quotes/${quoteId}/send`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(email ? { email } : {}),
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al enviar cotización' }));
+    throw new ApiClientError(err.detail || 'Error al enviar cotización', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Regenerar cotización (nueva versión basada en el presupuesto actual).
+ */
+export async function regenerateQuote(
+  token: string,
+  quoteId: string
+): Promise<GenerateQuoteResponse> {
+  const resp = await fetch(
+    `${API_URL}/api/v1/quotes/${quoteId}/regenerate`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al regenerar cotización' }));
+    throw new ApiClientError(err.detail || 'Error al regenerar cotización', resp.status);
+  }
+  return resp.json();
+}
+
 export { ApiClientError };
 export type {
   User,

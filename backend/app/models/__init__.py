@@ -8,6 +8,7 @@ from app.models.photo import Photo
 from app.models.catalog import AluminumSeries, Finish, GlassType, Hardware
 from app.models.budget import Budget, LaborCost, budget_hardware
 from app.models.signature import Signature, SignatureEvidence, SignatureStatus
+from app.models.quote import Quote, QuoteHistory, QuoteStatus
 
 __all__ = [
     "Base",
@@ -28,4 +29,7 @@ __all__ = [
     "Signature",
     "SignatureEvidence",
     "SignatureStatus",
+    "Quote",
+    "QuoteHistory",
+    "QuoteStatus",
 ]

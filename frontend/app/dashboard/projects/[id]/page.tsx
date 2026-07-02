@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getProject, getPhotos, uploadPhotos, deletePhoto, getProjectSignatures, requestSignature, getSignatureEvidence } from '@/lib/api';
-import type { Project, Photo } from '@/lib/api';
+import { getProject, getPhotos, uploadPhotos, deletePhoto, getProjectSignatures, requestSignature, getSignatureEvidence, generateQuote, getQuotes, downloadQuotePdf, sendQuoteEmail, regenerateQuote } from '@/lib/api';
+import type { Project, Photo, Quote } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -13,6 +13,8 @@ import PhotoGallery from '@/components/PhotoGallery';
 import BudgetForm from '@/components/BudgetForm';
 import SketchViewer from '@/components/SketchViewer';
 import EvidenceModal from '@/components/EvidenceModal';
+import QuoteList from '@/components/QuoteList';
+import SendEmailModal from '@/components/SendEmailModal';
 import {
   ArrowLeft,
   Edit,
@@ -37,7 +39,7 @@ import {
   XCircle,
 } from 'lucide-react';
 
-type TabId = 'details' | 'budget' | 'photos' | 'sketch' | 'signature';
+type TabId = 'details' | 'budget' | 'photos' | 'sketch' | 'signature' | 'quote';
 
 interface Tab {
   id: TabId;
@@ -70,6 +72,11 @@ const TABS: Tab[] = [
     id: 'signature',
     label: 'Firma',
     icon: <FileSignature className="w-4 h-4" />,
+  },
+  {
+    id: 'quote',
+    label: 'Cotización',
+    icon: <FileText className="w-4 h-4" />,
   },
 ];
 
@@ -118,6 +125,14 @@ export default function ProjectDetailPage() {
   const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
   const [evidenceData, setEvidenceData] = useState<any>(null);
   const [signatureLinkCopied, setSignatureLinkCopied] = useState(false);
+
+  // ─── Quote state ──────────────────────────────────────
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [quotesLoading, setQuotesLoading] = useState(false);
+  const [quotesError, setQuotesError] = useState<string | null>(null);
+  const [quoteGenerating, setQuoteGenerating] = useState(false);
+  const [sendEmailModalOpen, setSendEmailModalOpen] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
 
   // ─── Load project ────────────────────────────────────
   useEffect(() => {
@@ -247,6 +262,92 @@ export default function ProjectDetailPage() {
       }
     },
     []
+  );
+
+  // ─── Quote handlers ─────────────────────────────────
+  const loadQuotes = useCallback(async () => {
+    if (!token) return;
+    setQuotesLoading(true);
+    setQuotesError(null);
+    try {
+      const data = await getQuotes(token, id);
+      setQuotes(data);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al cargar cotizaciones.';
+      setQuotesError(msg);
+    } finally {
+      setQuotesLoading(false);
+    }
+  }, [token, id]);
+
+  useEffect(() => {
+    if (activeTab === 'quote') {
+      loadQuotes();
+    }
+  }, [activeTab, loadQuotes]);
+
+  const handleGenerateQuote = useCallback(async () => {
+    if (!token) return;
+    setQuoteGenerating(true);
+    try {
+      await generateQuote(token, id);
+      await loadQuotes();
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al generar cotización.';
+      setQuotesError(msg);
+    } finally {
+      setQuoteGenerating(false);
+    }
+  }, [token, id, loadQuotes]);
+
+  const handleDownloadQuote = useCallback(
+    async (quote: Quote) => {
+      if (!token) return;
+      try {
+        const blob = await downloadQuotePdf(token, quote.id);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${quote.folio}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : 'Error al descargar PDF.';
+        setQuotesError(msg);
+      }
+    },
+    [token]
+  );
+
+  const handleSendEmailClick = useCallback((quote: Quote) => {
+    setSelectedQuote(quote);
+    setSendEmailModalOpen(true);
+  }, []);
+
+  const handleSendEmailSuccess = useCallback(() => {
+    setSendEmailModalOpen(false);
+    setSelectedQuote(null);
+    loadQuotes();
+  }, [loadQuotes]);
+
+  const handleRegenerateQuote = useCallback(
+    async (quote: Quote) => {
+      if (!token) return;
+      try {
+        await regenerateQuote(token, quote.id);
+        await loadQuotes();
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : 'Error al regenerar cotización.';
+        setQuotesError(msg);
+      }
+    },
+    [token, loadQuotes]
   );
 
   // ─── Loading state ───────────────────────────────────
@@ -693,6 +794,55 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
+      {/* ─── Tab: Cotización ─────────────────────────── */}
+      {activeTab === 'quote' && (
+        <div className="space-y-6">
+          {/* Generar PDF button */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-[#1e40af]" />
+                Generar cotización
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-lg">
+                <p className="text-sm text-gray-700 mb-3">
+                  Genera un PDF de cotización profesional a partir del presupuesto actual del proyecto.
+                  El PDF incluirá datos del cliente, especificaciones técnicas, desglose de costos y condiciones comerciales.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  leftIcon={
+                    quoteGenerating ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <FileText className="w-4 h-4" />
+                    )
+                  }
+                  onClick={handleGenerateQuote}
+                  isLoading={quoteGenerating}
+                  disabled={quoteGenerating}
+                >
+                  {quoteGenerating ? 'Generando...' : 'Generar PDF'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quote list */}
+          <QuoteList
+            quotes={quotes}
+            loading={quotesLoading}
+            error={quotesError}
+            onDownload={handleDownloadQuote}
+            onSendEmail={handleSendEmailClick}
+            onRegenerate={handleRegenerateQuote}
+          />
+        </div>
+      )}
+
       {/* ─── Tab: Firma Digital ─────────────────────── */}
       {activeTab === 'signature' && (
         <div className="space-y-6">
@@ -841,6 +991,22 @@ export default function ProjectDetailPage() {
         open={evidenceModalOpen}
         onClose={() => setEvidenceModalOpen(false)}
       />
+
+      {/* ─── Send Email Modal ──────────────────────────── */}
+      {selectedQuote && (
+        <SendEmailModal
+          quoteId={selectedQuote.id}
+          quoteFolio={selectedQuote.folio}
+          defaultEmail={project?.client_email || ''}
+          open={sendEmailModalOpen}
+          onClose={() => {
+            setSendEmailModalOpen(false);
+            setSelectedQuote(null);
+          }}
+          onSuccess={handleSendEmailSuccess}
+          token={token!}
+        />
+      )}
     </div>
   );
 }

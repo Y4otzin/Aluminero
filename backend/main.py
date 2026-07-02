@@ -56,3 +56,6 @@ app.include_router(budget_router)
 
 from app.api.v1.signature.router import router as signature_router
 app.include_router(signature_router)
+
+from app.api.v1.quote.router import router as quote_router
+app.include_router(quote_router)
