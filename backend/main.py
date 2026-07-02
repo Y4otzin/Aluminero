@@ -53,3 +53,6 @@ app.include_router(catalogs_router)
 
 from app.api.v1.budget.router import router as budget_router
 app.include_router(budget_router)
+
+from app.api.v1.signature.router import router as signature_router
+app.include_router(signature_router)

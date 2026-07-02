@@ -7,6 +7,7 @@ from app.models.project import Project, WorkType, ProjectStatus
 from app.models.photo import Photo
 from app.models.catalog import AluminumSeries, Finish, GlassType, Hardware
 from app.models.budget import Budget, LaborCost, budget_hardware
+from app.models.signature import Signature, SignatureEvidence, SignatureStatus
 
 __all__ = [
     "Base",
@@ -24,4 +25,7 @@ __all__ = [
     "Budget",
     "LaborCost",
     "budget_hardware",
+    "Signature",
+    "SignatureEvidence",
+    "SignatureStatus",
 ]

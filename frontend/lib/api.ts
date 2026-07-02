@@ -722,6 +722,141 @@ export async function getLaborCosts(token: string): Promise<LaborCost[]> {
   return resp.json();
 }
 
+// ─── Tipos de Firma Digital ─────────────────────────────
+
+interface Signature {
+  id: string;
+  project_id: string;
+  budget_version: number;
+  signer_name?: string | null;
+  signer_email?: string | null;
+  signature_image?: string | null;
+  signer_ip?: string | null;
+  user_agent?: string | null;
+  signed_at?: string | null;
+  hash_sha256?: string | null;
+  status: 'pending' | 'signed' | 'rejected';
+  rejection_reason?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SignatureRequest {
+  budget_version: number;
+}
+
+interface SignData {
+  signer_name: string;
+  signer_email: string;
+  signature_image: string; // base64
+}
+
+interface SignatureEvidence {
+  id: string;
+  project_id: string;
+  signer_name: string;
+  signer_email: string;
+  signer_ip: string;
+  signed_at: string;
+  user_agent: string;
+  hash_sha256: string;
+  signature_image: string; // base64
+  budget_version: number;
+  project_name?: string;
+  total?: number;
+}
+
+// ─── Endpoints de Firma Digital ─────────────────────────
+
+/**
+ * Solicitar firma para un proyecto (envía notificación al cliente).
+ * Requiere token de autenticación.
+ */
+export async function requestSignature(
+  token: string,
+  projectId: string,
+  budgetVersion: number
+): Promise<Signature> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/request-signature`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ budget_version: budgetVersion } as SignatureRequest),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al solicitar firma' }));
+    throw new ApiClientError(err.detail || 'Error al solicitar firma', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Firmar digitalmente un documento (ruta pública, no requiere token).
+ */
+export async function sign(
+  signatureId: string,
+  data: SignData
+): Promise<Signature> {
+  const resp = await fetch(`${API_URL}/api/v1/signatures/${signatureId}/sign`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al firmar' }));
+    throw new ApiClientError(err.detail || 'Error al firmar', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Rechazar firma digitalmente (ruta pública, no requiere token).
+ */
+export async function rejectSignature(signatureId: string): Promise<Signature> {
+  const resp = await fetch(`${API_URL}/api/v1/signatures/${signatureId}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al rechazar firma' }));
+    throw new ApiClientError(err.detail || 'Error al rechazar firma', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Obtener evidencia legal de una firma.
+ */
+export async function getSignatureEvidence(
+  signatureId: string
+): Promise<SignatureEvidence> {
+  const resp = await fetch(`${API_URL}/api/v1/signatures/${signatureId}/evidence`);
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al obtener evidencia' }));
+    throw new ApiClientError(err.detail || 'Error al obtener evidencia', resp.status);
+  }
+  return resp.json();
+}
+
+/**
+ * Obtener todas las firmas de un proyecto.
+ */
+export async function getProjectSignatures(
+  token: string,
+  projectId: string
+): Promise<Signature[]> {
+  const resp = await fetch(`${API_URL}/api/v1/projects/${projectId}/signatures`, {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: 'Error al obtener firmas' }));
+    throw new ApiClientError(err.detail || 'Error al obtener firmas', resp.status);
+  }
+  return resp.json();
+}
+
 export { ApiClientError };
 export type {
   User,
@@ -745,4 +880,7 @@ export type {
   BudgetData,
   BudgetVersionSummary,
   LaborCost,
+  Signature,
+  SignatureEvidence,
+  SignData,
 };

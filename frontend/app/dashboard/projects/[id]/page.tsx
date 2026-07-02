@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { getProject, getPhotos, uploadPhotos, deletePhoto } from '@/lib/api';
+import { getProject, getPhotos, uploadPhotos, deletePhoto, getProjectSignatures, requestSignature, getSignatureEvidence } from '@/lib/api';
 import type { Project, Photo } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -12,6 +12,7 @@ import PhotoUploader from '@/components/PhotoUploader';
 import PhotoGallery from '@/components/PhotoGallery';
 import BudgetForm from '@/components/BudgetForm';
 import SketchViewer from '@/components/SketchViewer';
+import EvidenceModal from '@/components/EvidenceModal';
 import {
   ArrowLeft,
   Edit,
@@ -29,9 +30,14 @@ import {
   ImageIcon,
   DollarSign,
   Palette,
+  FileSignature,
+  Copy,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 
-type TabId = 'details' | 'budget' | 'photos' | 'sketch';
+type TabId = 'details' | 'budget' | 'photos' | 'sketch' | 'signature';
 
 interface Tab {
   id: TabId;
@@ -59,6 +65,11 @@ const TABS: Tab[] = [
     id: 'photos',
     label: 'Fotos',
     icon: <Camera className="w-4 h-4" />,
+  },
+  {
+    id: 'signature',
+    label: 'Firma',
+    icon: <FileSignature className="w-4 h-4" />,
   },
 ];
 
@@ -100,6 +111,14 @@ export default function ProjectDetailPage() {
   const [photosLoading, setPhotosLoading] = useState(false);
   const [photosError, setPhotosError] = useState<string | null>(null);
 
+  // ─── Signature state ─────────────────────────────────
+  const [signatures, setSignatures] = useState<any[]>([]);
+  const [signaturesLoading, setSignaturesLoading] = useState(false);
+  const [signaturesError, setSignaturesError] = useState<string | null>(null);
+  const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
+  const [evidenceData, setEvidenceData] = useState<any>(null);
+  const [signatureLinkCopied, setSignatureLinkCopied] = useState(false);
+
   // ─── Load project ────────────────────────────────────
   useEffect(() => {
     if (!token) return;
@@ -140,6 +159,29 @@ export default function ProjectDetailPage() {
     }
   }, [activeTab, loadPhotos]);
 
+  // ─── Load signatures (only when signature tab is active)
+  const loadSignatures = useCallback(async () => {
+    if (!token) return;
+    setSignaturesLoading(true);
+    setSignaturesError(null);
+    try {
+      const data = await getProjectSignatures(token, id);
+      setSignatures(data);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al cargar firmas.';
+      setSignaturesError(msg);
+    } finally {
+      setSignaturesLoading(false);
+    }
+  }, [token, id]);
+
+  useEffect(() => {
+    if (activeTab === 'signature') {
+      loadSignatures();
+    }
+  }, [activeTab, loadSignatures]);
+
   // ─── Photo upload handler ────────────────────────────
   const handleUpload = useCallback(
     async (files: File[]) => {
@@ -165,6 +207,46 @@ export default function ProjectDetailPage() {
       }
     },
     [token]
+  );
+
+  // ─── Signature handlers ──────────────────────────────
+  const handleRequestSignature = useCallback(async () => {
+    if (!token || !project) return;
+    try {
+      const sig = await requestSignature(token, id, 1);
+      setSignatures((prev) => [...prev, sig]);
+      await loadSignatures();
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : 'Error al solicitar firma.';
+      setSignaturesError(msg);
+    }
+  }, [token, project, id, loadSignatures]);
+
+  const handleCopySignatureLink = useCallback(
+    (signatureId: string) => {
+      const url = `${window.location.origin}/sign/${signatureId}`;
+      navigator.clipboard.writeText(url).then(() => {
+        setSignatureLinkCopied(true);
+        setTimeout(() => setSignatureLinkCopied(false), 2500);
+      });
+    },
+    []
+  );
+
+  const handleViewEvidence = useCallback(
+    async (signatureId: string) => {
+      try {
+        const evidence = await getSignatureEvidence(signatureId);
+        setEvidenceData(evidence);
+        setEvidenceModalOpen(true);
+      } catch (err: unknown) {
+        const msg =
+          err instanceof Error ? err.message : 'Error al cargar evidencia.';
+        setSignaturesError(msg);
+      }
+    },
+    []
   );
 
   // ─── Loading state ───────────────────────────────────
@@ -610,6 +692,155 @@ export default function ProjectDetailPage() {
           </Card>
         </div>
       )}
+
+      {/* ─── Tab: Firma Digital ─────────────────────── */}
+      {activeTab === 'signature' && (
+        <div className="space-y-6">
+          {/* Error banner */}
+          {signaturesError && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm text-red-700">{signaturesError}</p>
+            </div>
+          )}
+
+          {/* Estado del proyecto */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSignature className="w-5 h-5 text-[#1e40af]" />
+                Estado de Firma Digital
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Estado del proyecto</span>
+                  <StatusBadge status={project.status} size="sm" />
+                </div>
+
+                {/* Botón solicitar firma (solo en_cotizacion) */}
+                {project.status === 'en_cotizacion' && !project.is_locked && (
+                  <div className="p-4 bg-[#1e40af]/5 border border-[#1e40af]/20 rounded-lg">
+                    <p className="text-sm text-gray-700 mb-3">
+                      El proyecto está listo para solicitar la firma del cliente. Se
+                      enviará un enlace de firma digital al correo del cliente.
+                    </p>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      leftIcon={<FileSignature className="w-4 h-4" />}
+                      onClick={handleRequestSignature}
+                    >
+                      Solicitar firma
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de firmas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSignature className="w-5 h-5 text-[#1e40af]" />
+                Firmas registradas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {signaturesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-6 h-6 border-2 border-[#1e40af] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : signatures.length === 0 ? (
+                <div className="text-center py-8">
+                  <FileSignature className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-sm text-gray-500">
+                    No hay solicitudes de firma aún.
+                  </p>
+                  {project.status === 'en_cotizacion' && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Usa el botón &quot;Solicitar firma&quot; para iniciar el proceso.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {signatures.map((sig) => (
+                    <div
+                      key={sig.id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:border-gray-300 transition-colors"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          {sig.status === 'signed' ? (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                          ) : sig.status === 'rejected' ? (
+                            <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                          ) : (
+                            <FileSignature className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                          )}
+                          <span className="text-sm font-medium text-gray-900 capitalize">
+                            {sig.status === 'signed'
+                              ? 'Aprobado'
+                              : sig.status === 'rejected'
+                                ? 'Rechazado'
+                                : 'Pendiente de firma'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 ml-8">
+                          {sig.signer_name
+                            ? `Firmado por: ${sig.signer_name}`
+                            : `Solicitado: ${new Date(sig.created_at).toLocaleDateString('es-MX')}`}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+                        {/* Copiar link si está pendiente */}
+                        {sig.status === 'pending' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={
+                              signatureLinkCopied ? (
+                                <CheckCircle2 className="w-4 h-4" />
+                              ) : (
+                                <Copy className="w-4 h-4" />
+                              )
+                            }
+                            onClick={() => handleCopySignatureLink(sig.id)}
+                          >
+                            {signatureLinkCopied ? '¡Copiado!' : 'Copiar link'}
+                          </Button>
+                        )}
+
+                        {/* Ver evidencia si está firmado */}
+                        {(sig.status === 'signed' || sig.status === 'rejected') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            leftIcon={<ExternalLink className="w-4 h-4" />}
+                            onClick={() => handleViewEvidence(sig.id)}
+                          >
+                            Ver evidencia
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ─── Evidence Modal ───────────────────────────── */}
+      <EvidenceModal
+        evidence={evidenceData}
+        open={evidenceModalOpen}
+        onClose={() => setEvidenceModalOpen(false)}
+      />
     </div>
   );
 }
